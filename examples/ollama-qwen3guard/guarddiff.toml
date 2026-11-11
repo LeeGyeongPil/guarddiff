@@ -1,0 +1,46 @@
+# Live run on your own machine (optional): Ollama target + Qwen3Guard-Gen-0.6B on CPU.
+#   uv sync --extra hf && ollama pull qwen3:4b
+#   uv run guarddiff run examples/ollama-qwen3guard/guarddiff.toml --out out/live --latency measured
+# Roughly 1 s per guard check on CPU; the first call loads the model (about 5 s cached, about 50 s with download).
+[run]
+items = "../../src/guarddiff/packs/starter-en-ko.jsonl"
+baseline = "none"
+latency = "measured"
+
+[target]
+type = "openai"
+base_url = "http://127.0.0.1:11434/v1"   # Ollama's OpenAI-compatible endpoint
+model = "qwen3:4b"
+max_tokens = 512                          # reasoning models need room for the thinking text
+timeout_s = 600
+
+[[guards]]
+name = "keyword"
+type = "regex"
+patterns = ['\bbomb\b|폭탄', '\bkeylogger\b']
+
+[[guards]]
+name = "qwen3guard-strict"
+type = "hf-qwen3guard"
+mode = "strict"
+
+[[guards]]
+name = "qwen3guard-loose"
+type = "hf-qwen3guard"
+mode = "loose"
+
+[[variants]]
+name = "none"
+guards = []
+
+[[variants]]
+name = "keyword"
+guards = ["keyword"]
+
+[[variants]]
+name = "strict"
+guards = ["qwen3guard-strict"]
+
+[[variants]]
+name = "loose"
+guards = ["qwen3guard-loose"]
