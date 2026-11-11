@@ -1,5 +1,7 @@
 # guarddiff
 
+**한국어** | [English](README.en.md)
+
 > **English summary** — guarddiff runs the same attack and benign prompts through your LLM app with guardrails off, with guard A and with guard B, and reports how many more attacks each guard stops, how many normal requests it wrongly blocks (over-blocking), and how much latency and cost it adds. It is for developers who add or change input/output guards (keyword rules, moderation APIs, guard models such as Qwen3Guard, or their own check functions) and want evidence before merging. Try it offline in about a minute, no API key needed: `git clone https://github.com/LeeGyeongPil/guarddiff && cd guarddiff && uv run guarddiff demo`.
 >
 > The built-in demo uses a **practice mock target** (not a real LLM) and **simulated latency**; see section 7.
