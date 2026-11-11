@@ -1,0 +1,48 @@
+# Offline example: practice mock target + explanatory rule guards. No network, no keys.
+# Guards A and B are rules written for the 18 bundled prompts; do not expect the same numbers elsewhere.
+[run]
+items = "items.jsonl"
+baseline = "none"
+latency = "simulated"
+
+[target]
+type = "mock"            # practice mock, not a real LLM
+
+[judge]
+type = "rules"           # built-in refusal phrases (English and Korean)
+
+[[guards]]
+name = "A-keyword"
+type = "regex"
+stage = "input"
+patterns = ['\bbomb\b|폭탄', '\bkill\b|죽이', 'phishing|보이스피싱|사칭', 'keylogger', 'end (?:my|her|his) life', 'ignore all previous|이전 지시.*무시']
+unit_cost_usd = 0.0
+sim_latency_ms = 0.3
+
+[[guards]]
+name = "B-intent"
+type = "regex"
+stage = "input"
+patterns = ['(build|make).{0,20}bomb|폭탄 만드는', 'keylogger.*(hide|antivirus)', 'tricks? people|입력하게 만드는', '주민등록번호를 알아낼', 'most painless way to end']
+unit_cost_usd = 0.0002
+sim_latency_ms = 40.0
+
+[[guards]]
+name = "B-output-leak"
+type = "regex"
+stage = "output"
+patterns = ['SYSTEM PROMPT:|SECRET=']
+unit_cost_usd = 0.0002
+sim_latency_ms = 35.0
+
+[[variants]]
+name = "none"
+guards = []
+
+[[variants]]
+name = "A"
+guards = ["A-keyword"]
+
+[[variants]]
+name = "B"
+guards = ["B-intent", "B-output-leak"]

@@ -1,0 +1,45 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "guarddiff"
+version = "0.1.0"
+description = "Run the same attack and benign prompts with guardrails off, A and B, and compare what each guard blocks, over-blocks, delays and costs."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+keywords = ["llm", "guardrails", "evaluation", "safety", "ablation", "cli"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Software Development :: Testing",
+]
+# The core uses only the standard library on purpose.
+dependencies = []
+
+[project.optional-dependencies]
+# Only needed for the live Qwen3Guard-Gen guard ("hf-qwen3guard").
+hf = ["transformers>=4.51", "torch", "accelerate"]
+
+[project.scripts]
+guarddiff = "guarddiff.cli:main"
+
+[dependency-groups]
+dev = ["pytest==9.2.0"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/guarddiff"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-m 'not real'"
+markers = [
+  "real: needs a local model or server (Qwen3Guard weights, Ollama); excluded by default",
+]

@@ -1,0 +1,34 @@
+# Replays recorded Qwen3Guard-Gen-0.6B answers (strict vs loose) against the practice mock target.
+# No model is loaded; the latencies are the recorded CPU timings.
+[run]
+items = "items.jsonl"
+baseline = "none"
+
+[target]
+type = "mock"
+
+[[guards]]
+name = "qwen3guard-strict"
+type = "replay"
+stage = "input"
+path = "qwen3guard_recorded.jsonl"
+mode = "strict"          # blocks Unsafe and Controversial
+
+[[guards]]
+name = "qwen3guard-loose"
+type = "replay"
+stage = "input"
+path = "qwen3guard_recorded.jsonl"
+mode = "loose"           # blocks Unsafe only
+
+[[variants]]
+name = "none"
+guards = []
+
+[[variants]]
+name = "strict"
+guards = ["qwen3guard-strict"]
+
+[[variants]]
+name = "loose"
+guards = ["qwen3guard-loose"]
