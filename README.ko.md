@@ -5,6 +5,7 @@
 ```bash
 uv run guarddiff demo                                         # offline demo (practice mock)
 uv run guarddiff run guarddiff.toml --out out                 # your own comparison
+uv run guarddiff run guarddiff.toml --out out --concurrency 4 # 같은 비교를 4쌍씩 동시에
 uv run guarddiff gate out/summary.json --variant B --max-overblock 0.1   # CI pass/fail
 ```
 
@@ -18,7 +19,7 @@ uv run guarddiff gate out/summary.json --variant B --max-overblock 0.1   # CI pa
 - 입력: 문항 파일(JSONL)과 설정 파일(TOML)
 - 출력: 변형(가드 구성)별 표, 문항별 근거가 들어 있는 HTML 보고서, CI 에서 쓰는 통과/실패 종료 코드
 - 코어는 파이썬 표준 라이브러리만 씁니다(런타임 의존성 0개). 가드 모델(Qwen3Guard)을 직접 돌릴 때만 선택 설치(`[hf]`)가 필요합니다.
-- 테스트: `uv run pytest -q` 로 71개가 통과합니다(네트워크·모델·키 없이, 실제 모델이 필요한 2개는 기본 제외).
+- 테스트: `uv run pytest -q` 로 89개가 통과합니다(네트워크·모델·키 없이, 실제 모델이 필요한 2개는 기본 제외).
 
 **한 줄 정의**: 같은 질문 묶음을 "가드 없음 / 가드 A / 가드 B"로 각각 돌려, 막은 것·놓친 것·잘못 막은 것·늘어난 시간과 비용을 비교하는 평가 도구입니다.
 
@@ -300,6 +301,8 @@ failures = check_gate(result.summary, "pii", max_overblock=0.1, min_asr_reductio
 print("gate failures:", len(failures))   # 0
 ```
 
+`run_ablation(..., concurrency=4)` 는 한 번에 4쌍씩 돌립니다(기본 `1`).
+
 라이브러리도 CLI 와 같은 기본값을 씁니다. `max_indeterminate` 를 주지 않으면 기본 0 이 적용되어 불확정(`indeterminate`)이 하나라도 있는 변형은 실패로 나옵니다. 이 검사를 끄려면 `max_indeterminate=None` 을, 일부만 허용하려면 `max_indeterminate=0.05` 처럼 비율을 넘깁니다.
 
 `run_ablation` 은 `RunResult`(`.summary` 는 변형 이름 → 지표 딕셔너리, `.rows` 는 문항별 결과)를 돌려줍니다. 오류는 `GuarddiffError` 의 하위 클래스(`ConfigError`, `ItemsError`, `MissingExtraError`)로 올라옵니다.
@@ -308,11 +311,13 @@ print("gate failures:", len(failures))   # 0
 
 | 명령 | 하는 일 |
 |---|---|
-| `guarddiff run CONFIG [--out DIR] [--latency simulated\|measured] [--fresh] [--only VARIANT …]` | 비교를 돌려 `results.jsonl`·`summary.json`·`report.html` 을 씀. 기본은 이어 돌리기. `--only` 는 고른 변형(과 기준선)만 돌리고, 고르지 않은 변형의 기존 결과는 `results.jsonl` 에 그대로 보존(`kept N pairs …` 출력). `--fresh` 는 고른 변형을 처음부터 다시 돌림(`--only` 와 함께면 다른 변형은 보존) |
+| `guarddiff run CONFIG [--out DIR] [--latency simulated\|measured] [--fresh] [--only VARIANT …] [--concurrency N]` | 비교를 돌려 `results.jsonl`·`summary.json`·`report.html` 을 씀. 기본은 이어 돌리기. `--only` 는 고른 변형(과 기준선)만 돌리고, 고르지 않은 변형의 기존 결과는 `results.jsonl` 에 그대로 보존(`kept N pairs …` 출력). `--fresh` 는 고른 변형을 처음부터 다시 돌림(`--only` 와 함께면 다른 변형은 보존) |
 | `guarddiff report DIR [--format html\|md\|json]` | `results.jsonl` 에서 보고서를 다시 만듦 |
 | `guarddiff gate SUMMARY --variant NAME [한도…]` | 기준을 넘으면 종료 코드 1 (5절) |
 | `guarddiff demo [--out DIR]` | 동봉 offline 예제를 복사하고 바로 실행 |
 | `guarddiff init [DIR] [--force]` | 예제 설정·문항만 복사 |
+
+`--concurrency N`(기본 1 = 기존처럼 한 쌍씩 차례로)은 문항×변형 쌍을 N개 스레드로 동시에 호출합니다. python 가드·대상 함수는 스레드 안전해야 합니다. 호출이 겹치면 측정(measured) 지연이 부풀 수 있습니다(stderr 로 경고). 유료 API 의 요청 한도 때문에 `indeterminate` 가 늘 수 있고, 다음 `run` 에서 자동으로 다시 시도됩니다. 최종 결과 파일의 순서는 N 과 무관합니다. `0`·음수·정수가 아닌 값은 종료 코드 2 로 거부됩니다.
 
 `run` 은 이미 끝난 문항 × 변형을 건너뜁니다. 가드·대상·판정 설정이나 지연 모드를 바꾸면 해당 변형만 자동으로 다시 돌고 `rerun N pairs (config changed)` 가 출력됩니다. 다만 `module:function` 안의 코드 변경과 녹화(replay)·문항 묶음 파일 내용 변경은 감지하지 못하므로 `--fresh` 로 처음부터 다시 돌립니다.
 
@@ -578,7 +583,7 @@ uv run pytest -q
 ```
 
 ```text
-71 passed, 2 deselected in 3.37s
+89 passed, 2 deselected in 3.30s
 ```
 
 `2 deselected` 는 실제 모델·서버가 필요한 `real` 마커 테스트로 기본에서 제외됩니다(`uv run --extra hf pytest -m real` 로 실행). 버그·제안은 이슈로 남겨 주세요. 변경 기록은 [CHANGELOG.md](CHANGELOG.md).

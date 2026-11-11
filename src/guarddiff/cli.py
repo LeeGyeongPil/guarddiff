@@ -78,8 +78,24 @@ def _copy_example(dest: Path, *, overwrite: bool) -> list[Path]:
     return targets
 
 
+def _concurrency(text: str) -> int:
+    """argparse type: a whole number >= 1."""
+    try:
+        value = int(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"must be a whole number >= 1, got {text!r}") from None
+    if value < 1:
+        raise argparse.ArgumentTypeError(f"must be >= 1 (1 = one pair at a time), got {value}")
+    return value
+
+
 def cmd_run(args: argparse.Namespace) -> int:
-    result = run_ablation(args.config, args.out, latency=args.latency, fresh=args.fresh, only=args.only)
+    result = run_ablation(args.config, args.out, latency=args.latency, fresh=args.fresh, only=args.only,
+                          concurrency=args.concurrency)
+    if args.concurrency > 1 and result.meta.get("latency_mode") == "measured":
+        # one whole line in one write: lines never interleave
+        sys.stderr.write("warning: --concurrency > 1 with measured latency: calls overlap, so measured "
+                         "latencies can be inflated. Use simulated latency to compare guards.\n")
     _print_result(result)
     return 0
 
@@ -155,6 +171,8 @@ def build_parser() -> argparse.ArgumentParser:
                    help="do not reuse earlier results; run every pair of the selected variants again")
     r.add_argument("--only", nargs="+", metavar="VARIANT",
                    help="run only these variants (plus the baseline); results of the other variants are kept")
+    r.add_argument("--concurrency", type=_concurrency, default=1, metavar="N",
+                   help="run N (item, variant) pairs at the same time (default 1 = one after another)")
     r.set_defaults(func=cmd_run)
 
     rp = sub.add_parser("report", help="rebuild a report from an output folder")

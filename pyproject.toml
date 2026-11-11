@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "guarddiff"
-version = "0.1.0"
+version = "0.2.0"
 description = "Run the same attack and benign prompts with guardrails off, A and B, and compare what each guard blocks, over-blocks, delays and costs."
 readme = "README.md"
 requires-python = ">=3.11"

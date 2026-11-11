@@ -5,6 +5,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-11
+
+### Added
+- `guarddiff run --concurrency N` and `run_ablation(..., concurrency=N)`: run N (item, variant) pairs at the same time. The default 1 keeps the old sequential behavior; final `results.jsonl`, `summary.json` and the report do not depend on N. Values below 1 or non-integers are rejected (exit code 2 on the CLI). With measured latency and N > 1 a warning is printed to stderr.
+
 ## [0.1.0] - 2026-11-11
 
 ### Added

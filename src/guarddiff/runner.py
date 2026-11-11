@@ -6,9 +6,10 @@ import hashlib
 import json
 import os
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from .config import Config, Variant, load_config
 from .errors import ConfigError, GuarddiffError
@@ -174,8 +175,49 @@ def _select_variants(config: Config, only: list[str] | None) -> list[Variant]:
     return [v for v in config.variants if v.name in wanted]
 
 
+def check_concurrency(value: object) -> int:
+    """Return ``value`` when it is a whole number >= 1, otherwise raise a ConfigError that says what to give."""
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise ConfigError(f"concurrency must be a whole number >= 1 (1 = one pair at a time), got {value!r}.")
+    return value
+
+
+def _run_todo(todo: list[tuple[Item, Variant]], run_one: Callable[[Item, Variant], ResultRow],
+              record: Callable[[Item, Variant, ResultRow], None], concurrency: int) -> None:
+    """Run the pairs and hand every finished row to ``record``, which is only ever called from this thread.
+
+    concurrency 1 is the plain loop. Above 1 the pairs run in worker threads; rows are recorded in completion
+    order (the caller rewrites the file in config order afterwards). An error that escapes ``run_pair`` (Ctrl-C,
+    a bug) cancels the pairs not started yet, still records the pairs that finish, and is raised again.
+    """
+    workers = min(concurrency, len(todo))
+    if workers <= 1:
+        for item, variant in todo:
+            record(item, variant, run_one(item, variant))
+        return
+    failure: BaseException | None = None
+    with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="guarddiff-pair") as pool:
+        futures = {pool.submit(run_one, item, variant): (item, variant) for item, variant in todo}
+        try:
+            for fut in as_completed(futures):
+                if fut.cancelled():
+                    continue
+                exc = fut.exception()
+                if exc is not None:
+                    if failure is None:
+                        failure = exc
+                        pool.shutdown(wait=False, cancel_futures=True)  # pairs not started are dropped
+                    continue
+                record(*futures[fut], fut.result())
+        except BaseException:  # noqa: BLE001 - Ctrl-C in this thread: stop starting new pairs, then re-raise
+            pool.shutdown(wait=False, cancel_futures=True)
+            raise
+    if failure is not None:
+        raise failure
+
+
 def run_ablation(config: Config | str | Path, out_dir: str | Path, *, latency: str | None = None,
-                 fresh: bool = False, only: list[str] | None = None) -> RunResult:
+                 fresh: bool = False, only: list[str] | None = None, concurrency: int = 1) -> RunResult:
     """Run the ablation and write ``results.jsonl``, ``summary.json`` and ``report.html`` into ``out_dir``.
 
     Resuming: a pair (item, variant) already in results.jsonl is reused when its prompt, label and settings
@@ -183,7 +225,10 @@ def run_ablation(config: Config | str | Path, out_dir: str | Path, *, latency: s
     always run again, because the cause may be fixed by now. ``fresh`` recomputes the selected variants.
     ``only`` runs those variants plus the baseline; rows of the other variants stay in results.jsonl as they are.
     ``latency`` overrides the config ("simulated" or "measured").
+    ``concurrency`` is how many (item, variant) pairs run at the same time (default 1 = one after another).
+    Guard and target functions must be thread-safe when it is above 1. The final files do not depend on it.
     """
+    check_concurrency(concurrency)
     cfg = load_config(config) if isinstance(config, (str, Path)) else config
     mode = latency or cfg.latency
     if mode not in MODES:
@@ -239,12 +284,16 @@ def run_ablation(config: Config | str | Path, out_dir: str | Path, *, latency: s
             for g in guards.values():
                 g.prepare()
             with results_path.open("a", encoding="utf-8") as fh:
-                for item, variant in todo:
-                    row = run_pair(item, [guards[n] for n in variant.guards], target, judge, mode, variant.name)
+                def run_one(item: Item, variant: Variant) -> ResultRow:
+                    return run_pair(item, [guards[n] for n in variant.guards], target, judge, mode, variant.name)
+
+                def record(item: Item, variant: Variant, row: ResultRow) -> None:
                     row.config_hash = hashes[variant.name]
                     done[(item.id, variant.name)] = row
                     fh.write(json.dumps(row.to_dict(), ensure_ascii=False) + "\n")
-                    fh.flush()  # a crash loses at most the pair in flight
+                    fh.flush()  # a crash loses at most the pairs in flight
+
+                _run_todo(todo, run_one, record, concurrency)
 
         rows = [done[(i.id, v.name)] for i in items for v in variants]  # what this run compares
         _write_rows(results_path, _in_file_order(items, cfg.variants, {**kept, **done}))

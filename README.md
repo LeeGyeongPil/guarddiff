@@ -9,6 +9,7 @@ The built-in demo uses a **practice mock target** (not a real LLM) and **simulat
 ```bash
 uv run guarddiff demo                                         # Offline demo (practice mock)
 uv run guarddiff run guarddiff.toml --out out                 # Your own comparison
+uv run guarddiff run guarddiff.toml --out out --concurrency 4 # Same, 4 pairs at a time
 uv run guarddiff gate out/summary.json --variant B --max-overblock 0.1   # CI pass/fail
 ```
 
@@ -22,7 +23,7 @@ Adding a guardrail stops more attacks, but it can also block normal questions. Y
 - Input: an items file (JSONL) and a config file (TOML)
 - Output: a table per variant (guard configuration), an HTML report with per-item evidence, and pass/fail exit codes for CI
 - The core uses only the Python standard library (zero runtime dependencies). An optional install (`[hf]`) is needed only when you run a guard model (Qwen3Guard) yourself.
-- Tests: `uv run pytest -q` passes 71 (without network, models or keys; the 2 that need a real model are excluded by default).
+- Tests: `uv run pytest -q` passes 89 (without network, models or keys; the 2 that need a real model are excluded by default).
 
 **One-line definition**: an evaluation tool that runs the same set of questions with "no guard / guard A / guard B" and compares what was blocked, what was missed, what was wrongly blocked, and the added time and cost.
 
@@ -304,6 +305,8 @@ failures = check_gate(result.summary, "pii", max_overblock=0.1, min_asr_reductio
 print("gate failures:", len(failures))   # 0
 ```
 
+`run_ablation(..., concurrency=4)` runs four pairs at a time (default `1`).
+
 The library uses the same defaults as the CLI. If you do not give `max_indeterminate`, the default 0 applies, so a variant with even one indeterminate item comes out as a failure. To turn this check off, pass `max_indeterminate=None`; to allow a share, pass a ratio such as `max_indeterminate=0.05`.
 
 `run_ablation` returns a `RunResult` (`.summary` is a dict of variant name → metrics, `.rows` is the per-item results). Errors are raised as subclasses of `GuarddiffError` (`ConfigError`, `ItemsError`, `MissingExtraError`).
@@ -312,11 +315,13 @@ The library uses the same defaults as the CLI. If you do not give `max_indetermi
 
 | Command | What it does |
 |---|---|
-| `guarddiff run CONFIG [--out DIR] [--latency simulated\|measured] [--fresh] [--only VARIANT …]` | Runs the comparison and writes `results.jsonl`, `summary.json` and `report.html`. Resumes by default. `--only` runs only the chosen variants (and the baseline), and keeps the existing results of unchosen variants in `results.jsonl` as they are (prints `kept N pairs …`). `--fresh` reruns the chosen variants from scratch (with `--only`, other variants are kept) |
+| `guarddiff run CONFIG [--out DIR] [--latency simulated\|measured] [--fresh] [--only VARIANT …] [--concurrency N]` | Runs the comparison and writes `results.jsonl`, `summary.json` and `report.html`. Resumes by default. `--only` runs only the chosen variants (and the baseline), and keeps the existing results of unchosen variants in `results.jsonl` as they are (prints `kept N pairs …`). `--fresh` reruns the chosen variants from scratch (with `--only`, other variants are kept) |
 | `guarddiff report DIR [--format html\|md\|json]` | Rebuilds the report from `results.jsonl` |
 | `guarddiff gate SUMMARY --variant NAME [limits…]` | Exit code 1 if a threshold is exceeded (section 5) |
 | `guarddiff demo [--out DIR]` | Copies the bundled offline example and runs it right away |
 | `guarddiff init [DIR] [--force]` | Copies only the example config and items |
+
+`--concurrency N` (default 1 = one pair after another, exactly as before) calls N item × variant pairs at the same time in N threads. Python guard and target functions must be thread-safe. Measured latency can be inflated when calls overlap (a warning goes to stderr). With a paid API, request limits can raise the number of `indeterminate` pairs; the next `run` retries them automatically. The order in the final result files does not depend on N. `0`, negative and non-integer values are rejected with exit code 2.
 
 `run` skips item × variant pairs that are already done. If you change the guard, target or judge config or the latency mode, only the affected variants rerun automatically and `rerun N pairs (config changed)` is printed. However, changes to code inside `module:function` and changes to the contents of replay (recording) or item-pack files are not detected, so rerun from scratch with `--fresh`.
 
@@ -582,10 +587,10 @@ uv run pytest -q
 ```
 
 ```text
-71 passed, 2 deselected in 3.37s
+89 passed, 2 deselected in 3.30s
 ```
 
-The `2 deselected` are tests with the `real` marker that need a real model or server, and are excluded by default (run them with `uv run --extra hf pytest -m real`). Please leave bugs and suggestions as issues. The change log is [CHANGELOG.md](CHANGELOG.md) (Korean).
+The `2 deselected` are tests with the `real` marker that need a real model or server, and are excluded by default (run them with `uv run --extra hf pytest -m real`). Please leave bugs and suggestions as issues. The change log is [CHANGELOG.md](CHANGELOG.md).
 
 ### License
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 import time
 
 from guarddiff.targets.mock import MockTarget
@@ -68,3 +69,39 @@ def hanging_guard(text: str) -> bool:
 
 def blocks_everything(text: str) -> bool:
     return True
+
+
+# --- helpers for tests/test_concurrency.py (threads: everything shared is guarded by a lock) ---
+GATE = {"barrier": None, "stop_prompt": None, "boom_prompt": None}  # tests set these, then reset them
+_LOCK = threading.Lock()
+_ACTIVE = {"now": 0, "max": 0}
+
+
+def reset_gate() -> None:
+    GATE.update(barrier=None, stop_prompt=None, boom_prompt=None)
+    with _LOCK:
+        _ACTIVE.update(now=0, max=0)
+
+
+def max_active() -> int:
+    with _LOCK:
+        return _ACTIVE["max"]
+
+
+def gate_target(prompt: str) -> str:
+    """Counts how many calls are inside at once. With GATE['barrier'] set, every call waits there until all
+    parties have arrived, so the barrier only opens when the calls really run at the same time."""
+    with _LOCK:
+        _ACTIVE["now"] += 1
+        _ACTIVE["max"] = max(_ACTIVE["max"], _ACTIVE["now"])
+    try:
+        if GATE["stop_prompt"] == prompt:
+            raise KeyboardInterrupt  # Ctrl-C inside a worker
+        if GATE["boom_prompt"] == prompt:
+            raise RuntimeError("target backend exploded")
+        if GATE["barrier"] is not None:
+            GATE["barrier"].wait()  # BrokenBarrierError (after its timeout) makes the pair indeterminate
+        return _MOCK.call(prompt).text
+    finally:
+        with _LOCK:
+            _ACTIVE["now"] -= 1
