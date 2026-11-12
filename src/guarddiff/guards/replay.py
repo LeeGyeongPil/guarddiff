@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from ..errors import ConfigError, GuardParseError
+from ..i18n import t
 from .base import Guard, GuardVerdict
 from .qwen3guard import BLOCK_LABELS, LABELS, blocks, parse_output, reason_for
 
@@ -20,9 +21,9 @@ class ReplayGuard(Guard):
                  block_labels: list[str] | None = None, **kwargs: Any) -> None:
         super().__init__(name, stage, **kwargs)
         if block_labels is None and mode is None:
-            raise ConfigError(f"guard '{name}': set mode = \"strict\" | \"loose\" or block_labels = [...].")
+            raise ConfigError(t("guard.replay_mode", name=name))
         if mode is not None and mode not in BLOCK_LABELS:
-            raise ConfigError(f"guard '{name}': mode must be 'strict' or 'loose', got {mode!r}.")
+            raise ConfigError(t("guard.mode_named", name=name, value=mode))
         self._mode = mode
         self._block_labels = set(block_labels) if block_labels is not None else None
         self._records = self._load(Path(path))
@@ -30,7 +31,7 @@ class ReplayGuard(Guard):
     @staticmethod
     def _load(path: Path) -> dict[str, dict[str, Any]]:
         if not path.is_file():
-            raise ConfigError(f"replay file not found: {path}. Set 'path' to a recorded .jsonl file.")
+            raise ConfigError(t("guard.replay_missing", path=path))
         records: dict[str, dict[str, Any]] = {}
         for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
             if not line.strip():
@@ -39,8 +40,8 @@ class ReplayGuard(Guard):
                 rec = json.loads(line)
                 records[str(rec["id"])] = rec
             except (json.JSONDecodeError, KeyError, TypeError) as e:
-                raise ConfigError(f"{path}:{lineno}: invalid replay record ({type(e).__name__}). "
-                                  'Each line needs at least {"id": ..., "raw": ...}.') from e
+                raise ConfigError(t("guard.replay_record", path=path, lineno=lineno, kind=type(e).__name__,
+                                    example='{"id": ..., "raw": ...}')) from e
         return records
 
     def check(self, text: str, *, item_id: str, prompt: str) -> GuardVerdict:

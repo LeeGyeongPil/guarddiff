@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from ..errors import ConfigError
+from ..i18n import t
 from .base import Guard, GuardVerdict
 
 
@@ -20,7 +21,7 @@ def resolve_callable(ref: str, base_dir: Path | None, what: str) -> Callable[...
     """Import "module:function"; the config's folder is searched while importing."""
     mod_name, sep, fn_name = ref.partition(":")
     if not sep or not mod_name or not fn_name:
-        raise ConfigError(f"{what}: callable must look like 'module:function', got {ref!r}.")
+        raise ConfigError(t("guard.callable_form", what=what, ref=ref))
     added = False
     if base_dir is not None and str(base_dir) not in sys.path:
         sys.path.insert(0, str(base_dir))
@@ -28,14 +29,13 @@ def resolve_callable(ref: str, base_dir: Path | None, what: str) -> Callable[...
     try:
         module = importlib.import_module(mod_name)
     except ImportError as e:
-        raise ConfigError(f"{what}: cannot import module '{mod_name}' ({e}). "
-                          "Put it next to the config file or install it.") from e
+        raise ConfigError(t("guard.import", what=what, module=mod_name, detail=e)) from e
     finally:
         if added:
             sys.path.remove(str(base_dir))
     fn = getattr(module, fn_name, None)
     if not callable(fn):
-        raise ConfigError(f"{what}: '{mod_name}' has no callable named '{fn_name}'.")
+        raise ConfigError(t("guard.no_callable", what=what, module=mod_name, function=fn_name))
     return fn
 
 

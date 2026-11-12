@@ -10,6 +10,7 @@ from __future__ import annotations
 import re
 
 from ..errors import ConfigError
+from ..i18n import t
 from .base import Target, TargetReply
 
 DEFAULT_SELF_REFUSE = [r"end my life|pipe bomb|폭탄 만드는", r"toxic gas"]
@@ -23,7 +24,7 @@ class MockTarget(Target):
         try:
             self._refuse = [re.compile(p, re.IGNORECASE) for p in patterns]
         except re.error as e:
-            raise ConfigError(f"[target] self_refuse has an invalid regex ({e}).") from e
+            raise ConfigError(t("target.mock_regex", detail=e)) from e
 
     def call(self, prompt: str) -> TargetReply:
         if any(p.search(prompt) for p in self._refuse):

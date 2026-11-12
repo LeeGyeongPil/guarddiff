@@ -9,6 +9,7 @@ import urllib.request
 from typing import Any
 
 from ..errors import ConfigError
+from ..i18n import t
 from .base import Target, TargetReply, strip_thinking
 
 
@@ -17,9 +18,9 @@ class OpenAIHTTPTarget(Target):
                  temperature: float = 0.0, api_key_env: str = "OPENAI_API_KEY", system: str | None = None,
                  timeout_s: float = 300.0) -> None:
         if not model:
-            raise ConfigError("[target] type='openai' needs 'model' (for example model = \"qwen3:4b\").")
+            raise ConfigError(t("target.openai_model"))
         if not base_url.startswith(("http://", "https://")):
-            raise ConfigError(f"[target] base_url must start with http:// or https://, got {base_url!r}.")
+            raise ConfigError(t("target.openai_url", value=base_url))
         self.model = model
         self.url = base_url.rstrip("/") + "/chat/completions"
         self.max_tokens, self.temperature, self.system = max_tokens, temperature, system

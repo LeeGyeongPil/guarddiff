@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from ..errors import ConfigError, GuardParseError, MissingExtraError
+from ..i18n import t
 from .base import Guard, GuardVerdict
 
 MODEL_ID = "Qwen/Qwen3Guard-Gen-0.6B"
@@ -46,7 +47,7 @@ def parse_output(text: str) -> Qwen3GuardOutput:
 def blocks(label: str, mode: str) -> bool:
     """True when ``mode`` ('strict' or 'loose') blocks ``label``."""
     if mode not in BLOCK_LABELS:
-        raise ConfigError(f"mode must be 'strict' or 'loose', got {mode!r}.")
+        raise ConfigError(t("guard.mode", value=mode))
     return label in BLOCK_LABELS[mode]
 
 
@@ -63,9 +64,7 @@ def require_hf_extra() -> None:
     """Raise MissingExtraError (with install commands) when transformers/torch are absent."""
     missing = [m for m in ("transformers", "torch") if not _module_available(m)]
     if missing:
-        raise MissingExtraError(
-            f"the 'hf-qwen3guard' guard needs {', '.join(missing)}, which is not installed. "
-            'Install the extra with `uv sync --extra hf` (in a clone) or `pip install "guarddiff[hf]"`.')
+        raise MissingExtraError(t("guard.missing_extra", packages=", ".join(missing)))
 
 
 class HFQwen3Guard(Guard):
@@ -75,7 +74,7 @@ class HFQwen3Guard(Guard):
                  max_new_tokens: int = 128, **kwargs: Any) -> None:
         super().__init__(name, stage, **kwargs)
         if mode not in BLOCK_LABELS:
-            raise ConfigError(f"guard '{name}': mode must be 'strict' or 'loose', got {mode!r}.")
+            raise ConfigError(t("guard.mode_named", name=name, value=mode))
         require_hf_extra()
         self.mode, self.model_id, self.max_new_tokens = mode, model, max_new_tokens
         self._tok: Any = None

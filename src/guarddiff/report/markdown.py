@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from ..i18n import t
+
 if TYPE_CHECKING:
     from ..runner import RunResult
 
@@ -12,9 +14,9 @@ def notices(result: "RunResult") -> list[str]:
     """Honesty notes shown above every report: mock target, simulated latency."""
     notes: list[str] = []
     if result.meta.get("target_type", "mock") == "mock":
-        notes.append("practice mock target (not a real LLM)")
+        notes.append(t("report.notice_mock"))
     if any(s.get("latency_source") in ("simulated", "mixed") for s in result.summary.values()):
-        notes.append("simulated latency (reproducible placeholder values, not measurements)")
+        notes.append(t("report.notice_simulated"))
     return notes
 
 
@@ -33,9 +35,7 @@ def indeterminate_warning(result: "RunResult", reduction_name: str) -> str | Non
     flagged = [v for v in result.variants if result.summary[v]["indeterminate_rate"] > 0]
     if not flagged:
         return None
-    return (f"indeterminate items (a guard or the target failed) in: {', '.join(flagged)}. They are not counted "
-            f"as missed attacks, so {reduction_name} may look better than it is. Fix the failures, "
-            "or run `guarddiff gate`.")
+    return t("report.warn_indeterminate", variants=", ".join(flagged), reduction=reduction_name)
 
 
 def _ci(c: list[float]) -> str:
@@ -43,14 +43,14 @@ def _ci(c: list[float]) -> str:
 
 
 def render_markdown(result: "RunResult") -> str:
-    lines = ["## guarddiff report", ""]
+    lines = [f"## {t('report.title')}", ""]
     for n in notices(result):
         lines.append(f"> {n}")
     if lines[-1] != "":
         lines.append("")
-    lines += ["| variant | ASR (95% CI) | ASR reduction | overblock (95% CI) | indeterminate | p50 ms | p95 ms "
-              "| cost USD | McNemar p |",
-              "|---|---|---|---|---|---|---|---|---|"]
+    head = [t("md.variant"), t("md.asr"), t("md.asr_reduction"), t("md.overblock"), t("md.indeterminate"),
+            t("md.p50"), t("md.p95"), t("md.cost"), t("md.mcnemar")]
+    lines += ["| " + " | ".join(head) + " |", "|---|---|---|---|---|---|---|---|---|"]
     for v in result.variants:
         s = result.summary[v]
         pair = s["paired_vs_none"]
@@ -59,8 +59,8 @@ def render_markdown(result: "RunResult") -> str:
             f"| {s['guard_overblock_rate']:.3f} ({_ci(s['guard_overblock_ci95'])}) "
             f"| {s['indeterminate_rate']:.3f} | {s['guard_latency_ms_p50']:.1f} | {s['guard_latency_ms_p95']:.1f} "
             f"| {s['guard_cost_usd_total']:.4f} | {'-' if pair is None else pair['mcnemar_p']} |")
-    warning = indeterminate_warning(result, "the ASR reduction")
+    warning = indeterminate_warning(result, t("report.asr_reduction_the"))
     if warning:
         lines += ["", f"> **!** {warning}"]  # same warning as the `run` table, so a CI summary shows it too
-    lines += ["", f"Baseline variant: `{result.baseline}`. Rates use all items of a label as the denominator."]
+    lines += ["", t("md.baseline", baseline=result.baseline)]
     return "\n".join(lines) + "\n"

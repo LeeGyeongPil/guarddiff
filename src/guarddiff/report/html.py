@@ -7,6 +7,7 @@ from pathlib import Path
 from string import Template
 from typing import TYPE_CHECKING
 
+from ..i18n import current_lang, t
 from ..outcomes import OUTCOMES
 from .markdown import indeterminate_warning, notices, reduction_text
 
@@ -14,7 +15,7 @@ if TYPE_CHECKING:
     from ..runner import RunResult
 
 _PAGE = Template("""<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>guarddiff report</title>
+<html lang="$lang"><head><meta charset="utf-8"><title>$title</title>
 <style>
 body{font-family:system-ui,sans-serif;margin:1.5rem;color:#222}
 table{border-collapse:collapse;margin:1rem 0;font-size:.9rem}
@@ -24,13 +25,12 @@ th{background:#f3f3f3}.note{background:#fff6d6;border:1px solid #e0c870;padding:
 .o-model_overrefused{background:#fdf0d5}.o-indeterminate{background:#e3e3f4}
 small{color:#555}
 </style></head><body>
-<h1>guarddiff report</h1>
+<h1>$title</h1>
 $notes
-<h2>Summary</h2>
-<p><small>Baseline: <b>$baseline</b>. Rates use all items of a label as the denominator
-(indeterminate included). Intervals are Wilson 95%; the paired p is an exact McNemar test.</small></p>
+<h2>$summary_heading</h2>
+<p><small>$baseline_text</small></p>
 $summary_table
-<h2>Per item</h2>
+<h2>$items_heading</h2>
 $items_table
 </body></html>
 """)
@@ -45,10 +45,9 @@ def _ci(c: list[float]) -> str:
 
 
 def _summary_table(result: "RunResult") -> str:
-    head = ("<tr><th>variant</th><th>n atk / ben</th><th>ASR</th><th>ASR 95% CI</th><th>ASR reduction</th>"
-            "<th>overblock</th><th>overblock 95% CI</th><th>total overrefusal</th><th>indeterminate</th>"
-            "<th>latency p50 / p95 ms</th><th>cost USD</th><th>target calls</th>"
-            "<th>fixed / regressed</th><th>McNemar p</th><th>redundant blocks</th></tr>")
+    keys = ("variant", "n", "asr", "asr_ci", "asr_reduction", "overblock", "overblock_ci", "total_overrefusal",
+            "indeterminate", "latency", "cost", "calls", "fixed", "mcnemar", "redundant")
+    head = "<tr>" + "".join(f"<th>{_e(t('html.' + k))}</th>" for k in keys) + "</tr>"
     body = []
     for v in result.variants:
         s = result.summary[v]
@@ -65,7 +64,7 @@ def _summary_table(result: "RunResult") -> str:
                f"<td>{pair['redundant_blocks']}</td>")
             + "</tr>")
     table = f"<table>{head}{''.join(body)}</table>"
-    warning = indeterminate_warning(result, "the ASR reduction")
+    warning = indeterminate_warning(result, t("report.asr_reduction_the"))
     if warning:  # the '!' in the table points here
         table += f'<div class="note"><b>!</b> {_e(warning)}</div>'
     return table
@@ -78,7 +77,8 @@ def _items_table(result: "RunResult") -> str:
             order.append(r.id)
     first = {r.id: r for r in result.rows}
     cell = {(r.id, r.variant): r for r in result.rows}
-    head = "<tr><th>id</th><th>label</th><th>prompt</th>" + "".join(f"<th>{_e(v)}</th>" for v in result.variants) + "</tr>"
+    head = (f"<tr><th>{_e(t('html.id'))}</th><th>{_e(t('html.label'))}</th><th>{_e(t('html.prompt'))}</th>"
+            + "".join(f"<th>{_e(v)}</th>" for v in result.variants) + "</tr>")
     body = []
     for i in order:
         f = first[i]
@@ -91,14 +91,17 @@ def _items_table(result: "RunResult") -> str:
             ev = f"<br><small>{_e(r.evidence)}</small>" if r.evidence else ""
             tds.append(f"<td class=\"o-{_e(r.outcome)}\"><b>{_e(r.outcome)}</b>{ev}</td>")
         body.append(f"<tr><td>{_e(i)}</td><td>{_e(f.label)}</td><td>{_e(f.prompt)}</td>{''.join(tds)}</tr>")
-    legend = "<p><small>Outcomes: " + ", ".join(OUTCOMES) + ".</small></p>"
+    legend = "<p><small>" + _e(t("html.outcomes", outcomes=", ".join(OUTCOMES))) + "</small></p>"
     return f"<table>{head}{''.join(body)}</table>{legend}"
 
 
 def render_html(result: "RunResult") -> str:
     notes = "".join(f'<div class="note">{_e(n)}</div>' for n in notices(result))
-    return _PAGE.substitute(notes=notes, baseline=_e(result.baseline),
-                            summary_table=_summary_table(result), items_table=_items_table(result))
+    baseline_text = t("html.baseline", baseline=_e(result.baseline))  # the template holds the <b> tag; the name is escaped
+    return _PAGE.substitute(lang=current_lang(), title=_e(t("report.title")), notes=notes,
+                            summary_heading=_e(t("report.summary")), baseline_text=baseline_text,
+                            summary_table=_summary_table(result), items_heading=_e(t("report.per_item")),
+                            items_table=_items_table(result))
 
 
 def write_html(result: "RunResult", path: str | Path) -> Path:

@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import sys
 from pathlib import Path
 
 import pytest
+
+os.environ["GUARDDIFF_LANG"] = "en"  # import time, not a fixture: every runner gets English messages
 
 TESTS = Path(__file__).parent
 FIXTURES = TESTS / "fixtures"

@@ -13,6 +13,7 @@ from typing import Any, Callable
 
 from .config import Config, Variant, load_config
 from .errors import ConfigError, GuarddiffError
+from .i18n import t
 from .guards import Guard, build_guard
 from .items import Item, load_items
 from .judges import RulesJudge
@@ -170,7 +171,7 @@ def _select_variants(config: Config, only: list[str] | None) -> list[Variant]:
     names = [v.name for v in config.variants]
     unknown = [n for n in only if n not in names]
     if unknown:
-        raise ConfigError(f"--only: unknown variant(s) {unknown}. Defined variants: {names}.")
+        raise ConfigError(t("runner.only_unknown", unknown=unknown, names=names))
     wanted = set(only) | {config.baseline}  # the baseline is always needed for the comparison
     return [v for v in config.variants if v.name in wanted]
 
@@ -178,7 +179,7 @@ def _select_variants(config: Config, only: list[str] | None) -> list[Variant]:
 def check_concurrency(value: object) -> int:
     """Return ``value`` when it is a whole number >= 1, otherwise raise a ConfigError that says what to give."""
     if isinstance(value, bool) or not isinstance(value, int) or value < 1:
-        raise ConfigError(f"concurrency must be a whole number >= 1 (1 = one pair at a time), got {value!r}.")
+        raise ConfigError(t("runner.concurrency", value=value))
     return value
 
 
@@ -232,7 +233,7 @@ def run_ablation(config: Config | str | Path, out_dir: str | Path, *, latency: s
     cfg = load_config(config) if isinstance(config, (str, Path)) else config
     mode = latency or cfg.latency
     if mode not in MODES:
-        raise ConfigError(f"latency must be 'simulated' or 'measured', got {mode!r}.")
+        raise ConfigError(t("runner.latency", value=mode))
     items = load_items(cfg.items_path)
     variants = _select_variants(cfg, only)
     out = Path(out_dir)
@@ -329,10 +330,10 @@ def load_run(out_dir: str | Path) -> RunResult:
     out = Path(out_dir)
     results_path, summary_path = out / RESULTS_FILE, out / SUMMARY_FILE
     if not results_path.is_file():
-        raise GuarddiffError(f"{results_path} not found. Run `guarddiff run CONFIG --out {out}` first.")
+        raise GuarddiffError(t("runner.no_results", path=results_path, out=out))
     rows = _load_rows(results_path)
     if not rows:
-        raise GuarddiffError(f"{results_path} has no readable rows. Re-run with --fresh.")
+        raise GuarddiffError(t("runner.no_rows", path=results_path))
     meta: dict[str, Any] = {}
     if summary_path.is_file():
         try:

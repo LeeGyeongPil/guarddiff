@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from .errors import ConfigError, GuarddiffError
+from .i18n import t
 
 # option name -> (metric key in summary, kind): "max" fails when value > limit, "min" when value < limit
 LIMITS: dict[str, tuple[str, str]] = {
@@ -38,14 +39,13 @@ def load_summary(path: str | Path) -> dict[str, Any]:
     """Read a summary.json written by ``guarddiff run``."""
     p = Path(path)
     if not p.is_file():
-        raise GuarddiffError(
-            f"summary file not found: {p}. Run `guarddiff run CONFIG --out DIR` and pass DIR/summary.json.")
+        raise GuarddiffError(t("gate.summary_not_found", path=p))
     try:
         data = json.loads(p.read_text(encoding="utf-8"))
     except json.JSONDecodeError as e:
-        raise GuarddiffError(f"{p}: not valid JSON ({e.msg}). Pass the summary.json written by `guarddiff run`.") from e
+        raise GuarddiffError(t("gate.summary_bad_json", path=p, detail=e.msg)) from e
     if not isinstance(data, dict):
-        raise GuarddiffError(f"{p}: expected a JSON object.")
+        raise GuarddiffError(t("gate.summary_not_object", path=p))
     return data
 
 
@@ -57,7 +57,7 @@ def check_gate(summary: dict[str, Any], variant: str, **limits: float | None) ->
     """
     per_variant = summary["summary"] if isinstance(summary.get("summary"), dict) else summary
     if variant not in per_variant:
-        raise ConfigError(f"variant {variant!r} is not in the summary. Available: {sorted(per_variant)}.")
+        raise ConfigError(t("gate.unknown_variant", variant=variant, available=sorted(per_variant)))
     metrics = per_variant[variant]
     # A guard that failed on many items looks "good" (nothing was missed), so by default no failed items are
     # allowed. Pass max_indeterminate=<rate> to loosen it, or max_indeterminate=None to switch the check off.
@@ -65,15 +65,15 @@ def check_gate(summary: dict[str, Any], variant: str, **limits: float | None) ->
     failures: list[GateFailure] = []
     for name, limit in limits.items():
         if name not in LIMITS:
-            raise ConfigError(f"unknown gate limit {name!r}. Use: {', '.join(sorted(LIMITS))}.")
+            raise ConfigError(t("gate.unknown_limit", name=name, allowed=", ".join(sorted(LIMITS))))
         if limit is None:
             continue
         if not isinstance(limit, (int, float)) or math.isnan(limit) or limit < 0:
-            raise ConfigError(f"{name} must be a number >= 0, got {limit!r}.")
+            raise ConfigError(t("gate.bad_limit", name=name, value=limit))
         key, kind = LIMITS[name]
         value = metrics.get(key)
         if value is None:
-            raise ConfigError(f"{key} is not available for variant {variant!r} in this summary.")
+            raise ConfigError(t("gate.no_metric", key=key, variant=variant))
         if kind == "max" and value > limit:
             failures.append(GateFailure(key, value, limit, ">"))
         elif kind == "min" and value < limit:

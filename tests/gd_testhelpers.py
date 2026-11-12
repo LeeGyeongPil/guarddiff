@@ -2,6 +2,12 @@
 
 from __future__ import annotations
 
+import os
+
+# Pin the output language before anything reads it. This is plain Python, not a pytest feature, so any test runner
+# gets the same English messages even when LANG or LC_ALL is Korean.
+os.environ["GUARDDIFF_LANG"] = "en"
+
 import threading
 import time
 

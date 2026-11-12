@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import gd_testhelpers  # noqa: F401  (importing it pins GUARDDIFF_LANG=en for this test file)
+
 import importlib
 import json
 import sys
