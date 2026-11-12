@@ -5,6 +5,16 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-12
+
+### Added
+- Output language: English or Korean. Pick it with `--lang en|ko` (before or after the sub-command) or the `GUARDDIFF_LANG` environment variable, or let it follow `LC_ALL`, `LC_MESSAGES` and `LANG` (the first one that is set decides; a value starting with `ko` means Korean, anything else English). Help text, argparse messages, progress lines, warnings, error messages and the Markdown and HTML reports are translated; the HTML report sets `<html lang>`.
+- `guarddiff.i18n`: the single message table (`MESSAGES`), `t()` and `resolve_lang()`.
+- `gate` limit options now have help text.
+
+### Notes
+- Machine-readable data is the same in every language: `report --format json`, `summary.json` and `results.jsonl` (including the failure strings stored there). Scripts that compare printed text should pin `--lang en` or `GUARDDIFF_LANG=en`.
+
 ## [0.2.0] - 2026-11-11
 
 ### Added
