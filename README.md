@@ -23,7 +23,7 @@ Adding a guardrail stops more attacks, but it can also block normal questions. Y
 - Input: an items file (JSONL) and a config file (TOML)
 - Output: a table per variant (guard configuration), an HTML report with per-item evidence, and pass/fail exit codes for CI
 - The core uses only the Python standard library (zero runtime dependencies). An optional install (`[hf]`) is needed only when you run a guard model (Qwen3Guard) yourself.
-- Tests: `uv run pytest -q` passes 89 (without network, models or keys; the 2 that need a real model are excluded by default).
+- Tests: `uv run pytest -q` passes 123 (without network, models or keys; the 2 that need a real model are excluded by default).
 
 **One-line definition**: an evaluation tool that runs the same set of questions with "no guard / guard A / guard B" and compares what was blocked, what was missed, what was wrongly blocked, and the added time and cost.
 
@@ -321,6 +321,24 @@ The library uses the same defaults as the CLI. If you do not give `max_indetermi
 | `guarddiff demo [--out DIR]` | Copies the bundled offline example and runs it right away |
 | `guarddiff init [DIR] [--force]` | Copies only the example config and items |
 
+### Output language (English / Korean)
+
+Help text, progress lines, warnings, error messages and the Markdown and HTML reports can be shown in English or Korean. The language is chosen in this order, and the first one that is set wins:
+
+1. `--lang en` or `--lang ko` (works before or after the sub-command, for example `guarddiff --lang ko demo` or `guarddiff demo --lang ko`)
+2. the `GUARDDIFF_LANG` environment variable (`en` or `ko`)
+3. `LC_ALL`, then `LC_MESSAGES`, then `LANG`: a value that starts with `ko` (such as `ko_KR.UTF-8`) means Korean
+
+Anything else, including nothing set, `C`, `POSIX` or an unknown value, means English. `report.html` sets `<html lang="en">` or `<html lang="ko">` to match.
+
+```bash
+guarddiff demo --lang ko              # Korean output
+GUARDDIFF_LANG=ko guarddiff gate out/summary.json --variant B --max-overblock 0.05
+GUARDDIFF_LANG=en guarddiff run guarddiff.toml    # pin English, whatever LANG says
+```
+
+The language never changes machine-readable data: `report --format json`, `summary.json` and `results.jsonl` (including the failure texts stored in it) are byte-for-byte the same in both languages, and exit codes do not change. The metric names in the `run` table (`ASR`, `dASR`, `McNemar p` …) stay in English. If a script compares printed text, pin it with `--lang en` or `GUARDDIFF_LANG=en`, because a Korean `LANG` now switches the output to Korean.
+
 `--concurrency N` (default 1 = one pair after another, exactly as before) calls N item × variant pairs at the same time in N threads. Python guard and target functions must be thread-safe. Measured latency can be inflated when calls overlap (a warning goes to stderr). With a paid API, request limits can raise the number of `indeterminate` pairs; the next `run` retries them automatically. The order in the final result files does not depend on N. `0`, negative and non-integer values are rejected with exit code 2.
 
 `run` skips item × variant pairs that are already done. If you change the guard, target or judge config or the latency mode, only the affected variants rerun automatically and `rerun N pairs (config changed)` is printed. However, changes to code inside `module:function` and changes to the contents of replay (recording) or item-pack files are not detected, so rerun from scratch with `--fresh`.
@@ -587,7 +605,7 @@ uv run pytest -q
 ```
 
 ```text
-89 passed, 2 deselected in 3.30s
+123 passed, 2 deselected in 3.91s
 ```
 
 The `2 deselected` are tests with the `real` marker that need a real model or server, and are excluded by default (run them with `uv run --extra hf pytest -m real`). Please leave bugs and suggestions as issues. The change log is [CHANGELOG.md](CHANGELOG.md).
