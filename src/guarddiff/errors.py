@@ -21,3 +21,7 @@ class MissingExtraError(GuarddiffError):
 
 class GuardParseError(GuarddiffError):
     """A guard model answered in a format we cannot parse."""
+
+
+class ModelLoadError(GuarddiffError):
+    """A local guard model or its tokenizer could not be loaded (network, TLS, missing weights)."""

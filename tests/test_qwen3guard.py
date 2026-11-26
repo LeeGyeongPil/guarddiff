@@ -120,3 +120,80 @@ def test_qwen3guard_live_matches_recording():
                 rec["guard_label"] in ("Unsafe", "Controversial")), rec["id"]
     finally:
         guard.close()
+
+
+# --- model load failure: one line, exit code 2 -------------------------------------------------------------
+
+_LOAD_MSG = "We could not connect to huggingface.co\nsecond line"
+
+
+def _stub_hf_that_fails(monkeypatch):
+    """Fake torch/transformers whose from_pretrained raises OSError (multi-line message)."""
+    import types
+
+    def boom(*a, **k):
+        raise OSError(_LOAD_MSG)
+
+    tf = types.ModuleType("transformers")
+    for name in ("AutoTokenizer", "AutoModelForCausalLM"):
+        setattr(tf, name, types.SimpleNamespace(from_pretrained=boom))
+    torch = types.ModuleType("torch")
+    torch.float32 = "float32"
+    monkeypatch.setitem(sys.modules, "transformers", tf)
+    monkeypatch.setitem(sys.modules, "torch", torch)
+    monkeypatch.setattr(qwen3guard, "_module_available", lambda name: True)
+
+
+_HF_TOML = """
+[run]
+items = "items.jsonl"
+[[guards]]
+name = "qg"
+type = "hf-qwen3guard"
+[[variants]]
+name = "none"
+guards = []
+[[variants]]
+name = "qg"
+guards = ["qg"]
+"""
+
+
+def _hf_project(tmp_path):
+    return write_project(tmp_path / "p", items=[item("a", "benign", "hello")], toml=_HF_TOML)
+
+
+def test_model_load_failure_is_one_line_exit_2(tmp_path, monkeypatch, capsys):
+    from guarddiff.cli import main
+
+    _stub_hf_that_fails(monkeypatch)
+    cfg = _hf_project(tmp_path)
+    assert main(["run", str(cfg), "--out", str(tmp_path / "out")]) == 2
+    err = capsys.readouterr().err
+    lines = [ln for ln in err.splitlines() if ln.strip()]
+    assert "Traceback" not in err
+    assert len(lines) == 1 and lines[0].startswith("error:")
+    assert "Qwen/Qwen3Guard-Gen-0.6B" in lines[0]
+    assert "OSError: We could not connect to huggingface.co second line" in lines[0]
+
+
+def test_model_load_failure_korean(tmp_path, monkeypatch, capsys):
+    from guarddiff.cli import main
+
+    _stub_hf_that_fails(monkeypatch)
+    cfg = _hf_project(tmp_path)
+    assert main(["--lang", "ko", "run", str(cfg), "--out", str(tmp_path / "out")]) == 2
+    err = capsys.readouterr().err
+    assert "불러오지 못했습니다" in err and "OSError" in err and "Traceback" not in err
+
+
+def test_model_load_failure_library_keeps_cause(tmp_path, monkeypatch):
+    from guarddiff.errors import GuarddiffError, ModelLoadError
+
+    _stub_hf_that_fails(monkeypatch)
+    cfg = _hf_project(tmp_path)
+    with pytest.raises(ModelLoadError) as ei:
+        run_ablation(cfg, tmp_path / "out")
+    assert isinstance(ei.value, GuarddiffError)
+    assert isinstance(ei.value.__cause__, OSError)
+    assert "\n" not in str(ei.value)

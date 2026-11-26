@@ -5,6 +5,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-11-26
+
+### Changed
+- A model guard (`hf-qwen3guard`) that cannot load its tokenizer or model (network, TLS, missing weights) now ends with a one-line error and exit code 2 instead of a Python traceback and exit code 1. **The exit code changes from 1 to 2**, matching the other config and environment errors. The message keeps the original exception class and text. The library raises `guarddiff.errors.ModelLoadError` (a `GuarddiffError`) with the original exception as `__cause__`.
+
 ## [0.3.0] - 2026-11-12
 
 ### Added

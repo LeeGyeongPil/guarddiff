@@ -23,7 +23,7 @@ Adding a guardrail stops more attacks, but it can also block normal questions. Y
 - Input: an items file (JSONL) and a config file (TOML)
 - Output: a table per variant (guard configuration), an HTML report with per-item evidence, and pass/fail exit codes for CI
 - The core uses only the Python standard library (zero runtime dependencies). An optional install (`[hf]`) is needed only when you run a guard model (Qwen3Guard) yourself.
-- Tests: `uv run pytest -q` passes 123 (without network, models or keys; the 2 that need a real model are excluded by default).
+- Tests: `uv run pytest -q` passes 126 (without network, models or keys; the 2 that need a real model are excluded by default).
 
 **One-line definition**: an evaluation tool that runs the same set of questions with "no guard / guard A / guard B" and compares what was blocked, what was missed, what was wrongly blocked, and the added time and cost.
 
@@ -388,7 +388,7 @@ The guard now blocks nothing, so ASR is 1.000 and `indet` is 0. In this state `g
 |---|---|
 | 0 | All criteria passed |
 | 1 | A criterion failed (one line printed per metric showing which and by how much) |
-| 2 | Usage or config error (nonexistent variant name, nonexistent file, no limit given at all, etc.) |
+| 2 | Usage or config error (nonexistent variant name, nonexistent file, no limit given at all, a model guard that cannot be loaded, etc.) |
 
 ```bash
 uv run guarddiff gate guarddiff-demo/out/summary.json --variant A --max-overblock 0.2
@@ -588,7 +588,6 @@ The tools below have somewhat different purposes, so choose to suit your situati
 - With few items, proportion intervals are wide (such as 0.00–0.30 for 9). Read the interval and the McNemar p together.
 - The model's refusals are judged by regular-expression rules, so an indirect refusal with no refusal phrase may be missed. The basis for each judgment is kept per item so a person can check, and the rules can be changed in the config. The default refusal rules can be seen in `guarddiff.judges.rules.DEFAULT_REFUSAL_RULES` (both straight and curly quotes, English and Korean).
 - Indeterminate pairs are called again every time you resume. Failures whose cause cannot be fixed (for example an id with no answer in the replay file, or a paid target that always returns an empty response) are called again on every `run`, so the cost keeps accruing. If you see a `retry N …` line, fix the cause first.
-- If a model guard cannot be loaded (network, TLS, missing weights), a long Python traceback is shown instead of a one-line error, and it ends with exit code 1. In that case, check the TLS and 0-byte entries in section 10.
 - The demo guards A and B and the practice mock are for explanation (section 7).
 - This repo's tests were run and checked on Python 3.15.2, and 3.11 to 3.13 are checked by the CI configuration.
 
@@ -605,7 +604,7 @@ uv run pytest -q
 ```
 
 ```text
-123 passed, 2 deselected in 3.91s
+126 passed, 2 deselected in 3.91s
 ```
 
 The `2 deselected` are tests with the `real` marker that need a real model or server, and are excluded by default (run them with `uv run --extra hf pytest -m real`). Please leave bugs and suggestions as issues. The change log is [CHANGELOG.md](CHANGELOG.md).

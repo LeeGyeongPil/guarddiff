@@ -8,7 +8,7 @@ from .gate import GateFailure, check_gate
 from .outcomes import ResultRow
 from .runner import RunResult, run_ablation
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 
 __all__ = [
     "Config", "ConfigError", "GateFailure", "GuarddiffError", "ItemsError", "MissingExtraError",

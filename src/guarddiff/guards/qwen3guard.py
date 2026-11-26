@@ -11,7 +11,7 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-from ..errors import ConfigError, GuardParseError, MissingExtraError
+from ..errors import ConfigError, GuardParseError, MissingExtraError, ModelLoadError
 from ..i18n import t
 from .base import Guard, GuardVerdict
 
@@ -86,8 +86,13 @@ class HFQwen3Guard(Guard):
         import torch  # noqa: PLC0415 - lazy on purpose
         from transformers import AutoModelForCausalLM, AutoTokenizer  # noqa: PLC0415
 
-        self._tok = AutoTokenizer.from_pretrained(self.model_id)
-        self._model = AutoModelForCausalLM.from_pretrained(self.model_id, dtype=torch.float32)
+        try:
+            self._tok = AutoTokenizer.from_pretrained(self.model_id)
+            self._model = AutoModelForCausalLM.from_pretrained(self.model_id, dtype=torch.float32)
+        except Exception as e:  # noqa: BLE001 - any load failure becomes one readable line (Ctrl-C still passes)
+            self._tok = self._model = None
+            reason = " ".join(f"{type(e).__name__}: {e}".split())  # one line, original text kept
+            raise ModelLoadError(t("guard.model_load_failed", model=self.model_id, reason=reason)) from e
         self._model.eval()
         self._generate("warm-up", None)  # the first call is slow; keep it out of the latency numbers
 

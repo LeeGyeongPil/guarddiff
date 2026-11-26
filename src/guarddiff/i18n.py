@@ -282,6 +282,8 @@ MESSAGES: dict[str, dict[str, str]] = {
         "guard.mode_named": "guard '{name}': mode must be 'strict' or 'loose', got {value!r}.",
         "guard.missing_extra": "the 'hf-qwen3guard' guard needs {packages}, which is not installed. Install the "
                                "extra with `uv sync --extra hf` (in a clone) or `pip install \"guarddiff[hf]\"`.",
+        "guard.model_load_failed": "could not load model {model}: {reason}. See the TLS and 0-byte download "
+                                   "entries in section 10 of the README.",
         "guard.regex_patterns": "guard '{name}': 'patterns' must be a non-empty list of regular expressions.",
         "guard.regex_invalid": "guard '{name}': invalid regex {pattern!r} ({detail}).",
         "guard.replay_mode": "guard '{name}': set mode = \"strict\" | \"loose\" or block_labels = [...].",
@@ -457,6 +459,8 @@ MESSAGES: dict[str, dict[str, str]] = {
         "guard.missing_extra": "'hf-qwen3guard' 가드에는 {packages} 이(가) 필요하지만 설치되어 있지 않습니다. "
                                "`uv sync --extra hf` (클론한 경우) 또는 `pip install \"guarddiff[hf]\"` 로 추가 "
                                "패키지를 설치하십시오.",
+        "guard.model_load_failed": "모델 {model} 을(를) 불러오지 못했습니다: {reason}. README 10장의 TLS·0바이트 "
+                                   "다운로드 항목을 참고하십시오.",
         "guard.regex_patterns": "가드 '{name}': 'patterns' 는 비어 있지 않은 정규식 목록이어야 합니다.",
         "guard.regex_invalid": "가드 '{name}': 올바르지 않은 정규식 {pattern!r} ({detail}).",
         "guard.replay_mode": "가드 '{name}': mode = \"strict\" | \"loose\" 또는 block_labels = [...] 를 지정하십시오.",
